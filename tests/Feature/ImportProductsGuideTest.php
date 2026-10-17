@@ -11,8 +11,8 @@ use Tests\TestCase;
 class ImportProductsGuideTest extends TestCase
 {
     /**
-     * Valida que a página de guia de importação carrega com o dicionário de dados
-     * e permite baixar a planilha modelo CSV pré-formatada.
+     * Valida que a página de guia de importação carrega com o dicionário de dados em português
+     * e permite baixar a planilha modelo CSV pré-formatada com termos simples e descritivos.
      */
     public function test_import_products_guide_page_renders_and_downloads_sample(): void
     {
@@ -21,14 +21,14 @@ class ImportProductsGuideTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $this->actingAs($user);
 
-        // Renderização Livewire da página
+        // Renderização Livewire da página com cabeçalhos em português
         Livewire::test(ImportProductsGuide::class)
             ->assertSuccessful()
-            ->assertSee('Dicionário de Dados')
-            ->assertSee('sku')
-            ->assertSee('cost_price')
-            ->assertSee('sale_price')
-            ->assertSee('Baixar Planilha Modelo');
+            ->assertSee('codigo_produto_sku')
+            ->assertSee('nome_do_produto')
+            ->assertSee('preco_de_custo_fornecedor')
+            ->assertSee('preco_de_venda')
+            ->assertSee('Baixar Planilha Modelo Oficial');
 
         // Teste de download da planilha modelo CSV
         $page = new ImportProductsGuide();

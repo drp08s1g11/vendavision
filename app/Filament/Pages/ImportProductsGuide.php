@@ -40,8 +40,8 @@ class ImportProductsGuide extends Page
     }
 
     /**
-     * Gera e envia para download um arquivo CSV modelo formatado com BOM UTF-8
-     * compatível nativamente com Microsoft Excel, LibreOffice e Google Sheets.
+     * Gera e envia para download um arquivo CSV modelo formatado com cabeçalho 100% em português,
+     * termos descritivos de fácil compreensão e BOM UTF-8 para abertura perfeita no Microsoft Excel.
      */
     public function downloadSampleCsv(): StreamedResponse
     {
@@ -50,15 +50,16 @@ class ImportProductsGuide extends Page
             'Content-Disposition' => 'attachment; filename="modelo_importacao_produtos_ambrozio.csv"',
         ];
 
+        // Cabeçalho 100% em português claro e descritivo
         $columns = [
-            'sku',
-            'name',
-            'category',
-            'cost_price',
-            'sale_price',
-            'stock_reference',
-            'description',
-            'status',
+            'codigo_produto_sku',
+            'nome_do_produto',
+            'categoria',
+            'preco_de_custo_fornecedor',
+            'preco_de_venda',
+            'fornecedor_parceiro',
+            'descricao_detalhada',
+            'produto_ativo',
         ];
 
         $sampleRows = [
@@ -69,7 +70,7 @@ class ImportProductsGuide extends Page
                 '58.00',
                 '169.90',
                 'Arte Quadros SP',
-                'Tela canvas 100% algodão com chassi de madeira reflorestada',
+                'Tela canvas 100% algodão com chassi de madeira reflorestada 3cm',
                 '1',
             ],
             [
@@ -79,7 +80,7 @@ class ImportProductsGuide extends Page
                 '34.50',
                 '89.90',
                 'Confecções Têxtil MG',
-                'Capas em linho rústico premium com toque macio',
+                'Capas em linho rústico premium com zíper invisível e toque macio',
                 '1',
             ],
             [
@@ -89,7 +90,7 @@ class ImportProductsGuide extends Page
                 '48.00',
                 '139.90',
                 'Vidraçaria & Molduras',
-                'Vidro cristal lapidado de alta nitidez com acabamento premium',
+                'Vidro cristal lapidado de alta nitidez com suporte reforçado',
                 '1',
             ],
             [
@@ -99,14 +100,14 @@ class ImportProductsGuide extends Page
                 '26.00',
                 '79.90',
                 'Ateliê Cerâmica PR',
-                'Peça de design nórdico escultural para mesas e aparadores',
+                'Peça de design nórdico contemporâneo acabamento fosco',
                 '1',
             ],
         ];
 
         $callback = function () use ($columns, $sampleRows) {
             $file = fopen('php://output', 'w');
-            // Byte Order Mark (BOM) UTF-8 para o Excel reconhecer acentos no Windows
+            // Byte Order Mark (BOM) UTF-8 para o Excel reconhecer acentuação e caracteres no Windows
             fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
             fputcsv($file, $columns, ';');
             foreach ($sampleRows as $row) {
