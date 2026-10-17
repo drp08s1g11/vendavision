@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources\ProductResource\Pages;
 
-use App\Filament\Imports\ProductImporter;
+use App\Filament\Pages\ImportProductsGuide;
 use App\Filament\Resources\ProductResource;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
@@ -17,11 +17,11 @@ class ListProducts extends ListRecords
             Actions\CreateAction::make()
                 ->label('Novo Produto'),
 
-            Actions\ImportAction::make()
-                ->importer(ProductImporter::class)
+            Actions\Action::make('import_guide')
                 ->label('Importar Planilha')
                 ->icon('heroicon-o-arrow-up-tray')
-                ->color('gray'),
+                ->color('gray')
+                ->url(ImportProductsGuide::getUrl()),
         ];
     }
 }
