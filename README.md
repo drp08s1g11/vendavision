@@ -5,6 +5,9 @@
 > **Grupo:** DRP08-S1-G11  
 > **Parceiro / Estudo de Caso:** Ambrozio Decora (E-commerce & Dropshipping)  
 
+> 🚀 **Precisa instalar e rodar o projeto na sua máquina?**  
+> Consulte o [**Guia Completo de Instalação do Zero (Passo a Passo)**](GUIA_INSTALACAO_DO_ZERO.md) cobrindo desde a instalação do Docker até o primeiro login!
+
 ---
 
 ## 1. Visão Geral do Projeto
@@ -84,8 +87,8 @@ O sistema foi endurecido seguindo as diretrizes da **OWASP**, **ISO 27001** e **
 
 1. **Clonar o Repositório:**
    ```bash
-   git clone https://github.com/drp08s1g11/vendavision.git
-   cd vendavision
+   git clone <URL_DO_REPOSITORIO>
+   cd venda-vision
    ```
 
 2. **Configurar as Variáveis de Ambiente:**
