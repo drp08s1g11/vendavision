@@ -10,21 +10,20 @@ class DatabaseSeeder extends Seeder
 {
     /**
      * Seed the application's database.
+     * Cria apenas o usuário administrador inicial, mantendo a base 100% limpa
+     * de produtos e vendas para que o usuário cadastre tudo do zero.
      */
     public function run(): void
     {
-        // 1. Usuário Administrador Oficial para Demonstração e Avaliação
         User::firstOrCreate(
             ['email' => 'admin@ambrozio.com.br'],
             [
-                'name' => 'Alan Cesar Ambrozio',
+                'name' => 'Administrador',
                 'password' => Hash::make('password'),
             ]
         );
 
-        // 2. Povoamento Completo com Vendas, Itens e Catálogo Real da Ambrozio Decora
-        $this->call([
-            AmbrozioDecoraSeeder::class,
-        ]);
+        // Caso deseje popular o sistema com o catálogo e vendas de demonstração:
+        // php artisan db:seed --class=AmbrozioDecoraSeeder
     }
 }
