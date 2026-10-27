@@ -84,8 +84,8 @@ O sistema foi endurecido seguindo as diretrizes da **OWASP**, **ISO 27001** e **
 
 1. **Clonar o Repositório:**
    ```bash
-   git clone <URL_DO_REPOSITORIO>
-   cd venda-vision
+   git clone https://github.com/drp08s1g11/vendavision.git
+   cd vendavision
    ```
 
 2. **Configurar as Variáveis de Ambiente:**
