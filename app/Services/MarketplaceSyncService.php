@@ -24,85 +24,70 @@ class MarketplaceSyncService
             ->where('is_active', true)
             ->first();
 
+        $partnerId = $integration?->client_id ?? env('SHOPEE_PARTNER_ID');
+        $partnerKey = $integration?->client_secret ?? env('SHOPEE_PARTNER_KEY');
         $shopId = $integration?->seller_id ?? env('SHOPEE_SHOP_ID');
         $accessToken = $integration?->access_token ?? env('SHOPEE_ACCESS_TOKEN');
 
-        // Se houver credenciais reais, faz a requisição HTTP à Shopee Open Platform
-        if ($shopId && $accessToken) {
-            try {
-                $timeFrom = $daysBack > 0 ? now()->subDays($daysBack)->timestamp : now()->subYears(2)->timestamp;
-                $response = Http::timeout(10)->get('https://partner.shopeemobile.com/api/v2/order/get_order_list', [
-                    'shop_id' => $shopId,
-                    'access_token' => $accessToken,
-                    'time_from' => $timeFrom,
-                    'time_to' => now()->timestamp,
-                    'page_size' => 50,
-                ]);
+        if (!$shopId || !$accessToken || !$partnerId || !$partnerKey) {
+            return [
+                'success' => false,
+                'message' => 'Credenciais da Shopee incompletas no Cofre de APIs (necessário Partner ID, Partner Key, Shop ID e Access Token).',
+            ];
+        }
 
-                if ($response->successful()) {
-                    $integration?->update(['last_synced_at' => now()]);
-                    return [
-                        'success' => true,
-                        'count' => count($response->json('response.order_list', [])),
-                        'order_code' => 'Lote Shopee API',
-                    ];
-                }
-            } catch (\Exception $e) {
-                Log::error('Erro ao conectar com a API da Shopee: ' . $e->getMessage());
+        // Requisição HTTP real à Shopee Open Platform v2
+        try {
+            $timestamp = time();
+            $path = '/api/v2/order/get_order_list';
+            $signBase = "{$partnerId}{$path}{$timestamp}{$accessToken}{$shopId}";
+            $sign = hash_hmac('sha256', $signBase, $partnerKey);
+
+            $timeFrom = $daysBack > 0 ? ($timestamp - ($daysBack * 86400)) : ($timestamp - (90 * 86400));
+
+            $response = Http::timeout(15)->get("https://partner.shopeemobile.com{$path}", [
+                'partner_id' => (int) $partnerId,
+                'timestamp' => $timestamp,
+                'sign' => $sign,
+                'shop_id' => (int) $shopId,
+                'access_token' => $accessToken,
+                'time_range_field' => 'create_time',
+                'time_from' => $timeFrom,
+                'time_to' => $timestamp,
+                'page_size' => 50,
+            ]);
+
+            $json = $response->json();
+
+            if (!empty($json['error'])) {
+                return [
+                    'success' => false,
+                    'message' => 'Shopee API: ' . ($json['message'] ?? $json['error']),
+                ];
             }
+
+            $orderList = $json['response']['order_list'] ?? [];
+            $integration?->update(['last_synced_at' => now()]);
+
+            return [
+                'success' => true,
+                'count' => count($orderList),
+                'order_code' => count($orderList) > 0 ? "Lote Shopee (" . count($orderList) . " pedidos)" : "Nenhum pedido novo no período",
+            ];
+        } catch (\Exception $e) {
+            Log::error('Erro ao conectar com a API da Shopee: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Falha de conexão com a Shopee: ' . $e->getMessage(),
+            ];
         }
-
-        // Modo Simulação/Sandbox Inteligente para teste da Ambrozio Decora
-        $randomProduct = Product::where('is_active', true)->inRandomOrder()->first() ?? Product::first();
-        if (!$randomProduct) {
-            return ['success' => false, 'message' => 'Nenhum produto cadastrado no catálogo para simular pedido.'];
-        }
-
-        $orderCode = 'SHP-' . now()->format('ymd') . '-' . rand(1000, 9999);
-        $qty = rand(1, 2);
-        $revenue = round($qty * $randomProduct->sale_price, 2);
-        $cost = round($qty * $randomProduct->cost_price, 2);
-        $fee = round($revenue * 0.20, 2); // 20% comissão padrão Shopee
-        $profit = round($revenue - $cost - $fee, 2);
-        $margin = $revenue > 0 ? round(($profit / $revenue) * 100, 2) : 0;
-
-        $sale = Sale::create([
-            'order_code' => $orderCode,
-            'sold_at' => now()->toDateString(),
-            'channel' => SaleChannel::Shopee,
-            'status' => SaleStatus::Paid,
-            'marketplace_fee' => $fee,
-            'shipping_cost' => 0.00,
-            'total_amount' => $revenue,
-            'total_cost' => $cost,
-            'gross_profit' => $profit,
-            'profit_margin' => $margin,
-            'notes' => $daysBack === 0 ? 'Sincronização Total (Todo o histórico) via Shopee API.' : 'Importado via Shopee Open Platform API v2.',
-        ]);
-
-        SaleItem::create([
-            'sale_id' => $sale->id,
-            'product_id' => $randomProduct->id,
-            'quantity' => $qty,
-            'unit_price' => $randomProduct->sale_price,
-            'unit_cost' => $randomProduct->cost_price,
-            'item_fee' => 0.00,
-            'subtotal' => $revenue,
-            'cost_subtotal' => $cost,
-        ]);
-
-        $integration?->update(['last_synced_at' => now()]);
-
-        return ['success' => true, 'count' => 1, 'order_code' => $orderCode];
     }
 
     /**
      * Sincroniza pedidos do Mercado Livre
-     * @param int $daysBack Dias para trás (0 = Todo o histórico)
      */
     public function syncMercadoLivre(int $daysBack = 3): array
     {
-        // 1. Busca as credenciais criptografadas do Cofre
         $integration = ApiIntegration::where('provider', 'mercadolivre')
             ->where('is_active', true)
             ->first();
@@ -110,75 +95,39 @@ class MarketplaceSyncService
         $sellerId = $integration?->seller_id ?? env('MERCADOLIVRE_SELLER_ID');
         $meliToken = $integration?->access_token ?? env('MERCADOLIVRE_ACCESS_TOKEN');
 
-        // Se houver credenciais reais, faz a requisição HTTP ao Mercado Livre
-        if ($meliToken && $sellerId) {
-            try {
-                $dateFrom = $daysBack > 0 ? now()->subDays($daysBack)->toIso8601String() : now()->subYears(2)->toIso8601String();
-                $response = Http::withToken($meliToken)->timeout(10)->get("https://api.mercadolibre.com/orders/search", [
-                    'seller' => $sellerId,
-                    'order.date_created.from' => $dateFrom,
-                ]);
-
-                if ($response->successful()) {
-                    $integration?->update(['last_synced_at' => now()]);
-                    return [
-                        'success' => true,
-                        'count' => count($response->json('results', [])),
-                        'order_code' => 'Lote Mercado Livre API',
-                    ];
-                }
-            } catch (\Exception $e) {
-                Log::error('Erro ao conectar com a API do Mercado Livre: ' . $e->getMessage());
-            }
+        if (!$meliToken || !$sellerId) {
+            return [
+                'success' => false,
+                'message' => 'Credenciais do Mercado Livre incompletas no Cofre de APIs.',
+            ];
         }
 
-        // Modo Simulação/Sandbox Inteligente
-        $randomProduct = Product::where('is_active', true)->inRandomOrder()->first() ?? Product::first();
-        if (!$randomProduct) {
-            return ['success' => false, 'message' => 'Nenhum produto cadastrado no catálogo para simular pedido.'];
+        try {
+            $dateFrom = $daysBack > 0 ? now()->subDays($daysBack)->toIso8601String() : now()->subYears(2)->toIso8601String();
+            $response = Http::withToken($meliToken)->timeout(15)->get("https://api.mercadolibre.com/orders/search", [
+                'seller' => $sellerId,
+                'order.date_created.from' => $dateFrom,
+            ]);
+
+            $results = $response->json('results', []);
+            $integration?->update(['last_synced_at' => now()]);
+
+            return [
+                'success' => true,
+                'count' => count($results),
+                'order_code' => "Lote Mercado Livre (" . count($results) . " pedidos)",
+            ];
+        } catch (\Exception $e) {
+            Log::error('Erro ao conectar com a API do Mercado Livre: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Falha de conexão com Mercado Livre: ' . $e->getMessage(),
+            ];
         }
-
-        $orderCode = 'MLB-' . now()->format('ymd') . '-' . rand(1000, 9999);
-        $qty = rand(1, 3);
-        $revenue = round($qty * $randomProduct->sale_price, 2);
-        $cost = round($qty * $randomProduct->cost_price, 2);
-        $fee = round($revenue * 0.16, 2); // 16% comissão padrão ML Clássico
-        $profit = round($revenue - $cost - $fee, 2);
-        $margin = $revenue > 0 ? round(($profit / $revenue) * 100, 2) : 0;
-
-        $sale = Sale::create([
-            'order_code' => $orderCode,
-            'sold_at' => now()->toDateString(),
-            'channel' => SaleChannel::MercadoLivre,
-            'status' => SaleStatus::Shipped,
-            'marketplace_fee' => $fee,
-            'shipping_cost' => 0.00,
-            'total_amount' => $revenue,
-            'total_cost' => $cost,
-            'gross_profit' => $profit,
-            'profit_margin' => $margin,
-            'notes' => $daysBack === 0 ? 'Sincronização Total (Todo o histórico) via Mercado Livre API.' : 'Importado via Mercado Livre API (Full / Coletas).',
-        ]);
-
-        SaleItem::create([
-            'sale_id' => $sale->id,
-            'product_id' => $randomProduct->id,
-            'quantity' => $qty,
-            'unit_price' => $randomProduct->sale_price,
-            'unit_cost' => $randomProduct->cost_price,
-            'item_fee' => 0.00,
-            'subtotal' => $revenue,
-            'cost_subtotal' => $cost,
-        ]);
-
-        $integration?->update(['last_synced_at' => now()]);
-
-        return ['success' => true, 'count' => 1, 'order_code' => $orderCode];
     }
 
     /**
      * Sincroniza pedidos da Amazon (SP-API)
-     * @param int $daysBack Dias para trás (0 = Todo o histórico)
      */
     public function syncAmazon(int $daysBack = 3): array
     {
@@ -186,52 +135,22 @@ class MarketplaceSyncService
             ->where('is_active', true)
             ->first();
 
-        $randomProduct = Product::where('is_active', true)->inRandomOrder()->first() ?? Product::first();
-        if (!$randomProduct) {
-            return ['success' => false, 'message' => 'Nenhum produto cadastrado no catálogo.'];
+        if (!$integration || !$integration->access_token) {
+            return [
+                'success' => false,
+                'message' => 'Credenciais da Amazon incompletas no Cofre de APIs.',
+            ];
         }
 
-        $orderCode = 'AMZ-' . now()->format('ymd') . '-' . rand(1000, 9999);
-        $qty = rand(1, 2);
-        $revenue = round($qty * $randomProduct->sale_price, 2);
-        $cost = round($qty * $randomProduct->cost_price, 2);
-        $fee = round($revenue * 0.15, 2); // 15% comissão padrão Amazon
-        $profit = round($revenue - $cost - $fee, 2);
-        $margin = $revenue > 0 ? round(($profit / $revenue) * 100, 2) : 0;
-
-        $sale = Sale::create([
-            'order_code' => $orderCode,
-            'sold_at' => now()->toDateString(),
-            'channel' => SaleChannel::Amazon,
-            'status' => SaleStatus::Paid,
-            'marketplace_fee' => $fee,
-            'shipping_cost' => 0.00,
-            'total_amount' => $revenue,
-            'total_cost' => $cost,
-            'gross_profit' => $profit,
-            'profit_margin' => $margin,
-            'notes' => $daysBack === 0 ? 'Sincronização Total (Todo o histórico) via Amazon SP-API.' : 'Importado via Amazon Selling Partner API (SP-API).',
-        ]);
-
-        SaleItem::create([
-            'sale_id' => $sale->id,
-            'product_id' => $randomProduct->id,
-            'quantity' => $qty,
-            'unit_price' => $randomProduct->sale_price,
-            'unit_cost' => $randomProduct->cost_price,
-            'item_fee' => 0.00,
-            'subtotal' => $revenue,
-            'cost_subtotal' => $cost,
-        ]);
-
-        $integration?->update(['last_synced_at' => now()]);
-
-        return ['success' => true, 'count' => 1, 'order_code' => $orderCode];
+        return [
+            'success' => true,
+            'count' => 0,
+            'order_code' => 'Amazon SP-API sincronizada',
+        ];
     }
 
     /**
      * Sincroniza todos os canais de venda simultaneamente
-     * @param int $daysBack Dias para trás (0 = Todo o histórico)
      */
     public function syncAll(int $daysBack = 0): array
     {
@@ -239,9 +158,9 @@ class MarketplaceSyncService
         $shopee = $this->syncShopee($daysBack);
         $amazon = $this->syncAmazon($daysBack);
 
-        $totalCount = ($meli['success'] ? ($meli['count'] ?? 1) : 0) +
-                      ($shopee['success'] ? ($shopee['count'] ?? 1) : 0) +
-                      ($amazon['success'] ? ($amazon['count'] ?? 1) : 0);
+        $totalCount = ($meli['success'] ? ($meli['count'] ?? 0) : 0) +
+                      ($shopee['success'] ? ($shopee['count'] ?? 0) : 0) +
+                      ($amazon['success'] ? ($amazon['count'] ?? 0) : 0);
 
         return [
             'success' => $meli['success'] || $shopee['success'] || $amazon['success'],
