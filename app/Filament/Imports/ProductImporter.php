@@ -34,6 +34,10 @@ class ProductImporter extends Importer
             return null;
         }
 
+        // Caso contenha sinal negativo no início (ex: "-0,49" ou "- 5,00")
+        $isNegative = str_starts_with($cleaned, '-');
+        $cleaned = ltrim($cleaned, '-');
+
         // Caso contenha ponto de milhar e vírgula decimal (ex: 1.250,50)
         if (str_contains($cleaned, ',') && str_contains($cleaned, '.')) {
             $cleaned = str_replace('.', '', $cleaned);
@@ -43,7 +47,13 @@ class ProductImporter extends Importer
             $cleaned = str_replace(',', '.', $cleaned);
         }
 
-        return is_numeric($cleaned) ? round((float) $cleaned, 2) : null;
+        if (!is_numeric($cleaned)) {
+            return null;
+        }
+
+        $val = round((float) $cleaned, 2);
+        // Preços negativos em planilhas (erros de digitação como -0,49) são convertidos para 0.00
+        return $isNegative ? 0.00 : $val;
     }
 
     public static function getColumns(): array
