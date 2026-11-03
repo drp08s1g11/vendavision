@@ -56,6 +56,16 @@ class ProductResource extends Resource
                                         'unique' => 'Este SKU já está cadastrado (verifique também se não está na lixeira).',
                                     ]),
 
+                                Forms\Components\TextInput::make('category')
+                                    ->label('Categoria do Item')
+                                    ->placeholder('Ex: Quadros, Espelhos, Almofadas')
+                                    ->maxLength(255),
+
+                                Forms\Components\TextInput::make('stock_reference')
+                                    ->label('Fornecedor Parceiro')
+                                    ->placeholder('Ex: Arte Quadros SP')
+                                    ->maxLength(255),
+
                                 Forms\Components\Toggle::make('is_active')
                                     ->label('Produto Ativo para Vendas')
                                     ->helperText('Se desmarcado, não aparecerá na seleção de novos pedidos.')
@@ -139,6 +149,21 @@ class ProductResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->wrap(),
+
+                Tables\Columns\TextColumn::make('category')
+                    ->label('Categoria')
+                    ->badge()
+                    ->color('info')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('Geral'),
+
+                Tables\Columns\TextColumn::make('stock_reference')
+                    ->label('Fornecedor')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: false)
+                    ->placeholder('—'),
 
                 Tables\Columns\TextColumn::make('cost_price')
                     ->label('Custo')
