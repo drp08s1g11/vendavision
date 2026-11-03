@@ -16,21 +16,64 @@ class ListSales extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            // Botão 0: Sincronizar Tudo (Geral - Todos os Canais)
+            Actions\Action::make('syncAll')
+                ->label('Sincronizar Tudo (Todos os Canais)')
+                ->icon('heroicon-o-bolt')
+                ->color('success')
+                ->form([
+                    Forms\Components\Select::make('days_back')
+                        ->label('Período de busca')
+                        ->options([
+                            0 => 'Todo o período (Sincronizar Tudo do Histórico)',
+                            1 => 'Últimas 24 horas',
+                            3 => 'Últimos 3 dias',
+                            7 => 'Últimos 7 dias',
+                            15 => 'Últimos 15 dias',
+                            30 => 'Últimos 30 dias',
+                            90 => 'Últimos 90 dias',
+                        ])
+                        ->default(0)
+                        ->required(),
+                ])
+                ->modalHeading('Sincronização Completa de Canais')
+                ->modalDescription('O Venda Vision fará a varredura unificada em todos os marketplaces integrados (Mercado Livre, Shopee e Amazon) e atualizará custos, taxas e margens.')
+                ->modalSubmitActionLabel('Sincronizar Todos Agora')
+                ->action(function (array $data, MarketplaceSyncService $syncService) {
+                    $result = $syncService->syncAll((int) $data['days_back']);
+
+                    if ($result['success']) {
+                        Notification::make()
+                            ->title('Sincronização Global Concluída!')
+                            ->body("Varredura realizada com sucesso em todos os marketplaces integrados ({$result['total_orders']} pedidos sincronizados).")
+                            ->success()
+                            ->send();
+                    } else {
+                        Notification::make()
+                            ->title('Atenção na Sincronização')
+                            ->body('Não foi possível sincronizar todos os pedidos. Verifique os produtos cadastrados.')
+                            ->danger()
+                            ->send();
+                    }
+                }),
+
             // Botão 1: Sincronizar Mercado Livre
             Actions\Action::make('syncMeli')
-                ->label('Sincronizar Mercado Livre')
+                ->label('Mercado Livre')
                 ->icon('heroicon-o-arrow-path')
                 ->color('warning')
                 ->form([
                     Forms\Components\Select::make('days_back')
                         ->label('Período de busca')
                         ->options([
+                            0 => 'Todo o período (Sincronizar Tudo)',
                             1 => 'Últimas 24 horas',
                             3 => 'Últimos 3 dias',
                             7 => 'Últimos 7 dias',
                             15 => 'Últimos 15 dias',
+                            30 => 'Últimos 30 dias',
                         ])
-                        ->default(3)
+                        ->default(0)
                         ->required(),
                 ])
                 ->modalHeading('Sincronização Mercado Livre API')
@@ -56,19 +99,21 @@ class ListSales extends ListRecords
 
             // Botão 2: Sincronizar Shopee
             Actions\Action::make('syncShopee')
-                ->label('Sincronizar Shopee')
+                ->label('Shopee')
                 ->icon('heroicon-o-arrow-path')
                 ->color('danger')
                 ->form([
                     Forms\Components\Select::make('days_back')
                         ->label('Período de busca')
                         ->options([
+                            0 => 'Todo o período (Sincronizar Tudo)',
                             1 => 'Últimas 24 horas',
                             3 => 'Últimos 3 dias',
                             7 => 'Últimos 7 dias',
                             15 => 'Últimos 15 dias',
+                            30 => 'Últimos 30 dias',
                         ])
-                        ->default(3)
+                        ->default(0)
                         ->required(),
                 ])
                 ->modalHeading('Sincronização Shopee Open Platform API')

@@ -15,6 +15,7 @@ class MarketplaceSyncService
 {
     /**
      * Sincroniza pedidos da Shopee
+     * @param int $daysBack Dias para trás (0 = Todo o histórico)
      */
     public function syncShopee(int $daysBack = 3): array
     {
@@ -29,10 +30,11 @@ class MarketplaceSyncService
         // Se houver credenciais reais, faz a requisição HTTP à Shopee Open Platform
         if ($shopId && $accessToken) {
             try {
+                $timeFrom = $daysBack > 0 ? now()->subDays($daysBack)->timestamp : now()->subYears(2)->timestamp;
                 $response = Http::timeout(10)->get('https://partner.shopeemobile.com/api/v2/order/get_order_list', [
                     'shop_id' => $shopId,
                     'access_token' => $accessToken,
-                    'time_from' => now()->subDays($daysBack)->timestamp,
+                    'time_from' => $timeFrom,
                     'time_to' => now()->timestamp,
                     'page_size' => 50,
                 ]);
@@ -75,7 +77,7 @@ class MarketplaceSyncService
             'total_cost' => $cost,
             'gross_profit' => $profit,
             'profit_margin' => $margin,
-            'notes' => 'Importado via Shopee Open Platform API v2.',
+            'notes' => $daysBack === 0 ? 'Sincronização Total (Todo o histórico) via Shopee API.' : 'Importado via Shopee Open Platform API v2.',
         ]);
 
         SaleItem::create([
@@ -96,6 +98,7 @@ class MarketplaceSyncService
 
     /**
      * Sincroniza pedidos do Mercado Livre
+     * @param int $daysBack Dias para trás (0 = Todo o histórico)
      */
     public function syncMercadoLivre(int $daysBack = 3): array
     {
@@ -110,9 +113,10 @@ class MarketplaceSyncService
         // Se houver credenciais reais, faz a requisição HTTP ao Mercado Livre
         if ($meliToken && $sellerId) {
             try {
+                $dateFrom = $daysBack > 0 ? now()->subDays($daysBack)->toIso8601String() : now()->subYears(2)->toIso8601String();
                 $response = Http::withToken($meliToken)->timeout(10)->get("https://api.mercadolibre.com/orders/search", [
                     'seller' => $sellerId,
-                    'order.date_created.from' => now()->subDays($daysBack)->toIso8601String(),
+                    'order.date_created.from' => $dateFrom,
                 ]);
 
                 if ($response->successful()) {
@@ -153,7 +157,7 @@ class MarketplaceSyncService
             'total_cost' => $cost,
             'gross_profit' => $profit,
             'profit_margin' => $margin,
-            'notes' => 'Importado via Mercado Livre API (Full / Coletas).',
+            'notes' => $daysBack === 0 ? 'Sincronização Total (Todo o histórico) via Mercado Livre API.' : 'Importado via Mercado Livre API (Full / Coletas).',
         ]);
 
         SaleItem::create([
@@ -174,6 +178,7 @@ class MarketplaceSyncService
 
     /**
      * Sincroniza pedidos da Amazon (SP-API)
+     * @param int $daysBack Dias para trás (0 = Todo o histórico)
      */
     public function syncAmazon(int $daysBack = 3): array
     {
@@ -205,7 +210,7 @@ class MarketplaceSyncService
             'total_cost' => $cost,
             'gross_profit' => $profit,
             'profit_margin' => $margin,
-            'notes' => 'Importado via Amazon Selling Partner API (SP-API).',
+            'notes' => $daysBack === 0 ? 'Sincronização Total (Todo o histórico) via Amazon SP-API.' : 'Importado via Amazon Selling Partner API (SP-API).',
         ]);
 
         SaleItem::create([
@@ -222,5 +227,30 @@ class MarketplaceSyncService
         $integration?->update(['last_synced_at' => now()]);
 
         return ['success' => true, 'count' => 1, 'order_code' => $orderCode];
+    }
+
+    /**
+     * Sincroniza todos os canais de venda simultaneamente
+     * @param int $daysBack Dias para trás (0 = Todo o histórico)
+     */
+    public function syncAll(int $daysBack = 0): array
+    {
+        $meli = $this->syncMercadoLivre($daysBack);
+        $shopee = $this->syncShopee($daysBack);
+        $amazon = $this->syncAmazon($daysBack);
+
+        $totalCount = ($meli['success'] ? ($meli['count'] ?? 1) : 0) +
+                      ($shopee['success'] ? ($shopee['count'] ?? 1) : 0) +
+                      ($amazon['success'] ? ($amazon['count'] ?? 1) : 0);
+
+        return [
+            'success' => $meli['success'] || $shopee['success'] || $amazon['success'],
+            'total_orders' => $totalCount,
+            'details' => [
+                'mercadolivre' => $meli,
+                'shopee' => $shopee,
+                'amazon' => $amazon,
+            ],
+        ];
     }
 }
