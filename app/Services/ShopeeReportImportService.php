@@ -122,8 +122,8 @@ class ShopeeReportImportService
 
         DB::transaction(function () use ($ordersToProcess, &$importedCount) {
             foreach ($ordersToProcess as $orderCode => $orderData) {
-                // Determina status
-                $status = SaleStatus::Delivered; // No relatório de rendimento, o valor já foi concluído/liberado
+                // Determina status (se concluído/liberado ou cancelado/reembolsado)
+                $status = SaleStatus::Paid;
                 if ($orderData['refund_amount'] < 0 || $orderData['net_released'] <= 0) {
                     $status = SaleStatus::Cancelled;
                 }
