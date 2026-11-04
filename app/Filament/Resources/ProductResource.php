@@ -179,14 +179,18 @@ class ProductResource extends Resource
                 Tables\Columns\TextColumn::make('unit_profit')
                     ->label('Lucro Estimado')
                     ->money('BRL')
-                    ->sortable()
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => 
+                        $query->orderByRaw('(sale_price - cost_price) ' . $direction)
+                    )
                     ->color(fn ($state) => $state < 0 ? 'danger' : 'success'),
 
                 Tables\Columns\TextColumn::make('estimated_margin')
                     ->label('Margem %')
                     ->suffix('%')
                     ->badge()
-                    ->sortable()
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => 
+                        $query->orderByRaw('CASE WHEN sale_price > 0 THEN ((sale_price - cost_price) / sale_price) ELSE 0 END ' . $direction)
+                    )
                     ->color(fn (float $state): string => match (true) {
                         $state >= 35 => 'success',
                         $state >= 20 => 'info',
