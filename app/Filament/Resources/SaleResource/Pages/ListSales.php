@@ -4,10 +4,12 @@ namespace App\Filament\Resources\SaleResource\Pages;
 
 use App\Filament\Resources\SaleResource;
 use App\Services\MarketplaceSyncService;
+use App\Services\ShopeeReportImportService;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
+use Illuminate\Support\Facades\Storage;
 
 class ListSales extends ListRecords
 {
@@ -16,24 +18,69 @@ class ListSales extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            // Botão 0: Sincronizar Tudo (Geral - Todos os Canais)
+            // Botão A: Importar Planilha de Rendimento Shopee (CSV oficial exportado do Seller Center)
+            Actions\Action::make('importShopeeReport')
+                ->label('Importar Relatório Shopee (CSV)')
+                ->icon('heroicon-o-arrow-up-tray')
+                ->color('info')
+                ->modalHeading('Importar Relatório de Rendimento da Shopee')
+                ->modalDescription('Faça upload do arquivo CSV exportado da sua Carteira/Rendimento no Shopee Seller Center. O sistema reconhecerá automaticamente todos os pedidos, taxas de comissão, métodos de pagamento e produtos.')
+                ->modalSubmitActionLabel('Processar Relatório Agora')
+                ->form([
+                    Forms\Components\FileUpload::make('report_file')
+                        ->label('Selecione o arquivo do Relatório (.CSV)')
+                        ->acceptedFileTypes(['text/csv', 'text/plain', 'application/vnd.ms-excel', 'application/csv'])
+                        ->disk('local')
+                        ->directory('temp-shopee-reports')
+                        ->required(),
+                ])
+                ->action(function (array $data, ShopeeReportImportService $importService) {
+                    $filePath = Storage::disk('local')->path($data['report_file']);
+
+                    if (!file_exists($filePath)) {
+                        Notification::make()
+                            ->title('Arquivo não encontrado')
+                            ->danger()
+                            ->send();
+                        return;
+                    }
+
+                    $content = file_get_contents($filePath);
+                    $result = $importService->importFromCsvContent($content);
+
+                    // Limpa o arquivo temporário
+                    @unlink($filePath);
+
+                    if ($result['success']) {
+                        Notification::make()
+                            ->title('Relatório Shopee Importado!')
+                            ->body($result['message'])
+                            ->success()
+                            ->send();
+                    } else {
+                        Notification::make()
+                            ->title('Erro ao processar relatório')
+                            ->body($result['message'])
+                            ->danger()
+                            ->send();
+                    }
+                }),
+
+            // Botão 0: Sincronizar Tudo (Geral - Todos os Canais via API)
             Actions\Action::make('syncAll')
-                ->label('Sincronizar Tudo (Todos os Canais)')
+                ->label('Sincronizar Tudo (APIs)')
                 ->icon('heroicon-o-bolt')
                 ->color('success')
                 ->form([
                     Forms\Components\Select::make('days_back')
                         ->label('Período de busca')
                         ->options([
-                            0 => 'Todo o período (Sincronizar Tudo do Histórico)',
-                            1 => 'Últimas 24 horas',
-                            3 => 'Últimos 3 dias',
+                            15 => 'Últimos 15 dias (Limite máximo permitido pela Shopee)',
                             7 => 'Últimos 7 dias',
-                            15 => 'Últimos 15 dias',
-                            30 => 'Últimos 30 dias',
-                            90 => 'Últimos 90 dias',
+                            3 => 'Últimos 3 dias',
+                            1 => 'Últimas 24 horas',
                         ])
-                        ->default(0)
+                        ->default(15)
                         ->required(),
                 ])
                 ->modalHeading('Sincronização Completa de Canais')
@@ -45,7 +92,7 @@ class ListSales extends ListRecords
                     if ($result['success']) {
                         Notification::make()
                             ->title('Sincronização Global Concluída!')
-                            ->body("Varredura realizada com sucesso em todos os marketplaces integrados ({$result['total_orders']} pedidos sincronizados).")
+                            ->body("Varredura realizada com sucesso ({$result['total_orders']} pedidos sincronizados).")
                             ->success()
                             ->send();
                     } else {
@@ -57,7 +104,7 @@ class ListSales extends ListRecords
                     }
                 }),
 
-            // Botão 1: Sincronizar Mercado Livre
+            // Botão 1: Sincronizar Mercado Livre via API
             Actions\Action::make('syncMeli')
                 ->label('Mercado Livre')
                 ->icon('heroicon-o-arrow-path')
@@ -66,14 +113,13 @@ class ListSales extends ListRecords
                     Forms\Components\Select::make('days_back')
                         ->label('Período de busca')
                         ->options([
-                            0 => 'Todo o período (Sincronizar Tudo)',
                             1 => 'Últimas 24 horas',
                             3 => 'Últimos 3 dias',
                             7 => 'Últimos 7 dias',
                             15 => 'Últimos 15 dias',
                             30 => 'Últimos 30 dias',
                         ])
-                        ->default(0)
+                        ->default(15)
                         ->required(),
                 ])
                 ->modalHeading('Sincronização Mercado Livre API')
@@ -97,23 +143,21 @@ class ListSales extends ListRecords
                     }
                 }),
 
-            // Botão 2: Sincronizar Shopee
+            // Botão 2: Sincronizar Shopee via API
             Actions\Action::make('syncShopee')
-                ->label('Shopee')
+                ->label('Shopee (API)')
                 ->icon('heroicon-o-arrow-path')
                 ->color('danger')
                 ->form([
                     Forms\Components\Select::make('days_back')
                         ->label('Período de busca')
                         ->options([
-                            0 => 'Todo o período (Sincronizar Tudo)',
-                            1 => 'Últimas 24 horas',
-                            3 => 'Últimos 3 dias',
+                            15 => 'Últimos 15 dias (Limite máximo da Shopee)',
                             7 => 'Últimos 7 dias',
-                            15 => 'Últimos 15 dias',
-                            30 => 'Últimos 30 dias',
+                            3 => 'Últimos 3 dias',
+                            1 => 'Últimas 24 horas',
                         ])
-                        ->default(0)
+                        ->default(15)
                         ->required(),
                 ])
                 ->modalHeading('Sincronização Shopee Open Platform API')
