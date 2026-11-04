@@ -36,9 +36,9 @@ class PricingSimulator extends Page implements HasForms
             'shipping_cost' => 15.00,
             'tax_rate' => 4.0,
             'target_margin' => 25.0,
-            'commission_rate' => 16.0,
-            'fixed_fee' => 6.00,
-            'channel' => 'Mercado Livre (Premium)',
+            'commission_rate' => 20.0,
+            'fixed_fee' => 4.00,
+            'channel' => 'Shopee (Frete Grátis)',
         ]);
     }
 
@@ -81,22 +81,33 @@ class PricingSimulator extends Page implements HasForms
                         Grid::make(3)->schema([
                             Select::make('channel')
                                 ->label('Canal Predefinido')
-                                ->options([
-                                    'Mercado Livre (Premium)' => 'Mercado Livre Premium (16% + R$ 6)',
-                                    'Mercado Livre (Clássico)' => 'Mercado Livre Clássico (11% + R$ 6)',
-                                    'Shopee (Padrão)' => 'Shopee Padrão (14% + R$ 4)',
-                                    'Shopee (Frete Grátis)' => 'Shopee Frete Grátis (20% + R$ 4)',
-                                    'Amazon Brasil' => 'Amazon Brasil (15%)',
-                                    'Loja Própria / WhatsApp' => 'Loja Própria (Cartão/Gateway 4%)',
-                                    'Personalizado' => 'Personalizado / Outro',
-                                ])
+                                ->options(function () {
+                                    $opts = [
+                                        'Shopee (Frete Grátis)' => 'Shopee Frete Grátis (20% + R$ 4)',
+                                        'Shopee (Padrão)' => 'Shopee Padrão (14% + R$ 4)',
+                                    ];
+
+                                    if (\App\Models\ApiIntegration::isProviderActive('mercadolivre')) {
+                                        $opts['Mercado Livre (Premium)'] = 'Mercado Livre Premium (16% + R$ 6)';
+                                        $opts['Mercado Livre (Clássico)'] = 'Mercado Livre Clássico (11% + R$ 6)';
+                                    }
+
+                                    if (\App\Models\ApiIntegration::isProviderActive('amazon')) {
+                                        $opts['Amazon Brasil'] = 'Amazon Brasil (15%)';
+                                    }
+
+                                    $opts['Loja Própria / WhatsApp'] = 'Loja Própria (Cartão/Gateway 4%)';
+                                    $opts['Personalizado'] = 'Personalizado / Outro';
+
+                                    return $opts;
+                                })
                                 ->live()
                                 ->afterStateUpdated(function ($state, callable $set) {
                                     match ($state) {
+                                        'Shopee (Frete Grátis)' => [$set('commission_rate', 20.0), $set('fixed_fee', 4.0)],
+                                        'Shopee (Padrão)' => [$set('commission_rate', 14.0), $set('fixed_fee', 4.0)],
                                         'Mercado Livre (Premium)' => [$set('commission_rate', 16.0), $set('fixed_fee', 6.0)],
                                         'Mercado Livre (Clássico)' => [$set('commission_rate', 11.0), $set('fixed_fee', 6.0)],
-                                        'Shopee (Padrão)' => [$set('commission_rate', 14.0), $set('fixed_fee', 4.0)],
-                                        'Shopee (Frete Grátis)' => [$set('commission_rate', 20.0), $set('fixed_fee', 4.0)],
                                         'Amazon Brasil' => [$set('commission_rate', 15.0), $set('fixed_fee', 0.0)],
                                         'Loja Própria / WhatsApp' => [$set('commission_rate', 4.0), $set('fixed_fee', 0.0)],
                                         default => null,
@@ -196,42 +207,53 @@ class PricingSimulator extends Page implements HasForms
 
         $presets = [
             [
-                'name' => 'Mercado Livre (Premium)',
-                'commission_rate' => 0.16,
-                'fixed_fee' => 6.0,
-                'badge' => 'primary',
-            ],
-            [
-                'name' => 'Mercado Livre (Clássico)',
-                'commission_rate' => 0.11,
-                'fixed_fee' => 6.0,
-                'badge' => 'info',
-            ],
-            [
                 'name' => 'Shopee (Frete Grátis)',
+                'provider' => 'shopee',
                 'commission_rate' => 0.20,
                 'fixed_fee' => 4.0,
                 'badge' => 'warning',
             ],
             [
                 'name' => 'Shopee (Padrão)',
+                'provider' => 'shopee',
                 'commission_rate' => 0.14,
                 'fixed_fee' => 4.0,
                 'badge' => 'warning',
             ],
             [
+                'name' => 'Mercado Livre (Premium)',
+                'provider' => 'mercadolivre',
+                'commission_rate' => 0.16,
+                'fixed_fee' => 6.0,
+                'badge' => 'primary',
+            ],
+            [
+                'name' => 'Mercado Livre (Clássico)',
+                'provider' => 'mercadolivre',
+                'commission_rate' => 0.11,
+                'fixed_fee' => 6.0,
+                'badge' => 'info',
+            ],
+            [
                 'name' => 'Amazon Brasil',
+                'provider' => 'amazon',
                 'commission_rate' => 0.15,
                 'fixed_fee' => 0.0,
                 'badge' => 'danger',
             ],
             [
                 'name' => 'Loja Própria / WhatsApp',
+                'provider' => null,
                 'commission_rate' => 0.04,
                 'fixed_fee' => 0.0,
                 'badge' => 'success',
             ],
         ];
+
+        // Oculta plataformas não instaladas
+        $presets = array_values(array_filter($presets, function ($preset) {
+            return $preset['provider'] === null || \App\Models\ApiIntegration::isProviderActive($preset['provider']);
+        }));
 
         $results = [];
 

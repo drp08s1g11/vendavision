@@ -47,6 +47,13 @@
             </button>
         </div>
 
+        <div class="mb-6 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+            <div class="text-sm text-blue-900 dark:text-blue-300">
+                <p class="font-semibold text-blue-950 dark:text-blue-200 mb-1">Controle de Ativação de Canais & APIs</p>
+                <p>Apenas os marketplaces com a opção <strong>"Integração Ativa"</strong> ligada exibirão botões de busca/importação no painel de Vendas e opções nos filtros do Dashboard. Plataformas inativas (como Mercado Livre, Amazon, etc.) permanecem totalmente ocultas do sistema até serem ativadas aqui.</p>
+            </div>
+        </div>
+
         <form wire:submit.prevent="save">
             {{ $this->form }}
 

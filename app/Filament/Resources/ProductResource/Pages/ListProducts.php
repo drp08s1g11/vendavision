@@ -18,8 +18,8 @@ class ListProducts extends ListRecords
                 ->label('Novo Produto'),
 
             Actions\Action::make('import_guide')
-                ->label('Importar Planilha')
-                ->icon('heroicon-o-arrow-up-tray')
+                ->label('Planilha Modelo / Instruções')
+                ->icon('heroicon-o-document-text')
                 ->color('gray')
                 ->url(ImportProductsGuide::getUrl()),
         ];

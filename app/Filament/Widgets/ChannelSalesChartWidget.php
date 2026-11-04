@@ -32,23 +32,27 @@ class ChannelSalesChartWidget extends ChartWidget
             ->when($channelFilter, fn ($query) => $query->where('channel', $channelFilter))
             ->get();
 
-        $channels = [
-            SaleChannel::MercadoLivre->value => ['label' => 'Mercado Livre', 'color' => '#fbbf24'],
-            SaleChannel::Shopee->value => ['label' => 'Shopee', 'color' => '#f97316'],
-            SaleChannel::Amazon->value => ['label' => 'Amazon', 'color' => '#38bdf8'],
-            SaleChannel::Direct->value => ['label' => 'Venda Direta', 'color' => '#10b981'],
+        $channelDefinitions = [
+            SaleChannel::Shopee->value => ['label' => 'Shopee', 'color' => '#f97316', 'provider' => 'shopee'],
+            SaleChannel::MercadoLivre->value => ['label' => 'Mercado Livre', 'color' => '#fbbf24', 'provider' => 'mercadolivre'],
+            SaleChannel::Amazon->value => ['label' => 'Amazon', 'color' => '#38bdf8', 'provider' => 'amazon'],
+            SaleChannel::Direct->value => ['label' => 'Venda Direta', 'color' => '#10b981', 'provider' => null],
         ];
 
         $labels = [];
         $data = [];
         $backgroundColors = [];
 
-        foreach ($channels as $key => $info) {
+        foreach ($channelDefinitions as $key => $info) {
             $total = (float) $sales->filter(fn ($s) => $s->channel === SaleChannel::tryFrom($key) || $s->channel === $key || (is_object($s->channel) && $s->channel->value === $key))->sum('total_amount');
+            $isActive = $info['provider'] ? \App\Models\ApiIntegration::isProviderActive($info['provider']) : ($total > 0);
 
-            $labels[] = $info['label'];
-            $data[] = $total;
-            $backgroundColors[] = $info['color'];
+            // Oculta plataformas não instaladas que não possuem vendas registradas
+            if ($total > 0 || $isActive) {
+                $labels[] = $info['label'];
+                $data[] = $total;
+                $backgroundColors[] = $info['color'];
+            }
         }
 
         if (array_sum($data) === 0.0) {

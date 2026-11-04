@@ -15,10 +15,10 @@ class ManageIntegrations extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-key';
+    protected static ?string $navigationIcon = 'heroicon-o-puzzle-piece';
     protected static ?string $navigationGroup = 'Configurações';
-    protected static ?string $navigationLabel = 'Cofre de APIs & Integrações';
-    protected static ?string $title = 'Cofre de Credenciais de Marketplaces';
+    protected static ?string $navigationLabel = 'Canais & APIs (Marketplaces)';
+    protected static ?string $title = 'Gerenciamento de Canais & APIs de Marketplaces';
     protected static ?int $navigationSort = 10;
 
     protected static string $view = 'filament.pages.manage-integrations';
@@ -30,8 +30,8 @@ class ManageIntegrations extends Page implements HasForms
 
     public function mount(): void
     {
-        // Verifica se a sessão segura já está desbloqueada nesta sessão
-        if (session('integrations_vault_unlocked')) {
+        // Se em ambiente local ou já desbloqueado nesta sessão, permite edição direta
+        if (session('integrations_vault_unlocked') || app()->environment('local')) {
             $this->isUnlocked = true;
             $this->loadIntegrationsData();
         }
@@ -149,7 +149,8 @@ class ManageIntegrations extends Page implements HasForms
                             ]),
 
                         Forms\Components\Toggle::make('is_active')
-                            ->label('Integração Ativa para Busca de Vendas')
+                            ->label('Integração Ativa no Sistema')
+                            ->helperText('Quando ativo, os botões deste marketplace ficarão visíveis na listagem de Vendas e filtros do Dashboard.')
                             ->default(true),
                     ]),
             ])

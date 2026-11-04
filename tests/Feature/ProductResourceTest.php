@@ -46,4 +46,36 @@ class ProductResourceTest extends TestCase
             ->sortTable('unit_profit', 'desc')
             ->assertCanSeeTableRecords([$p1, $p2], inOrder: true);
     }
+
+    public function test_product_table_has_export_and_import_actions(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        Livewire::test(ListProducts::class)
+            ->assertTableActionExists('export')
+            ->assertTableActionExists('import');
+    }
+
+    public function test_product_importer_resolves_existing_record_by_sku(): void
+    {
+        $existing = Product::create([
+            'name' => 'Poltrona Original',
+            'sku' => 'SKU-EXISTING',
+            'cost_price' => 50.00,
+            'sale_price' => 100.00,
+            'is_active' => true,
+        ]);
+
+        $importer = new \App\Filament\Imports\ProductImporter(new \Filament\Actions\Imports\Models\Import(), [], []);
+        $reflection = new \ReflectionClass($importer);
+        $dataProperty = $reflection->getProperty('data');
+        $dataProperty->setAccessible(true);
+        $dataProperty->setValue($importer, ['sku' => 'SKU-EXISTING', 'name' => 'Poltrona Atualizada']);
+
+        $resolved = $importer->resolveRecord();
+
+        $this->assertNotNull($resolved);
+        $this->assertEquals($existing->id, $resolved->id, 'Deve reutilizar o registro existente com o mesmo SKU para evitar duplicatas.');
+    }
 }

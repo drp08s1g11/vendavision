@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Exports\ProductExporter;
+use App\Filament\Imports\ProductImporter;
 use App\Filament\Resources\ProductResource\Pages;
 use App\Models\Product;
 use Filament\Forms;
@@ -9,6 +11,9 @@ use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Actions\ExportAction;
+use Filament\Tables\Actions\ExportBulkAction;
+use Filament\Tables\Actions\ImportAction;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -135,6 +140,19 @@ class ProductResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->headerActions([
+                ExportAction::make()
+                    ->label('Exportar Produtos (Excel / CSV)')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('success')
+                    ->exporter(ProductExporter::class),
+
+                ImportAction::make()
+                    ->label('Importar Produtos (Excel / CSV)')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->color('primary')
+                    ->importer(ProductImporter::class),
+            ])
             ->columns([
                 Tables\Columns\TextColumn::make('sku')
                     ->label('SKU')
@@ -224,6 +242,9 @@ class ProductResource extends Resource
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
+                    ExportBulkAction::make()
+                        ->label('Exportar Selecionados')
+                        ->exporter(ProductExporter::class),
                     Tables\Actions\DeleteBulkAction::make(),
                     Tables\Actions\RestoreBulkAction::make(),
                     // ForceDeleteBulk removido por segurança

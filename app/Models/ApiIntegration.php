@@ -34,4 +34,26 @@ class ApiIntegration extends Model
         'is_active' => 'boolean',
         'last_synced_at' => 'datetime',
     ];
+
+    /**
+     * Verifica se determinado provedor/marketplace está ativo no sistema.
+     */
+    public static function isProviderActive(string $provider): bool
+    {
+        return static::where('provider', $provider)
+            ->where('is_active', true)
+            ->exists();
+    }
+
+    /**
+     * Retorna a lista de provedores/marketplaces com integração ativa.
+     *
+     * @return array<string>
+     */
+    public static function getActiveProviders(): array
+    {
+        return static::where('is_active', true)
+            ->pluck('provider')
+            ->toArray();
+    }
 }

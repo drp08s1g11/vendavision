@@ -37,8 +37,26 @@ class Dashboard extends BaseDashboard
 
                         Select::make('channel')
                             ->label('Canal de Venda')
-                            ->placeholder('Todos os Canais')
-                            ->options(SaleChannel::class),
+                            ->placeholder('Todos os Canais Ativos')
+                            ->options(function () {
+                                $options = [];
+                                foreach (SaleChannel::cases() as $case) {
+                                    $provider = match ($case) {
+                                        SaleChannel::Shopee => 'shopee',
+                                        SaleChannel::MercadoLivre => 'mercadolivre',
+                                        SaleChannel::Amazon => 'amazon',
+                                        default => null,
+                                    };
+
+                                    $isActive = $provider ? \App\Models\ApiIntegration::isProviderActive($provider) : false;
+                                    $hasSales = \App\Models\Sale::where('channel', $case)->exists();
+
+                                    if ($isActive || $hasSales) {
+                                        $options[$case->value] = $case->getLabel();
+                                    }
+                                }
+                                return $options;
+                            }),
                     ])
                     ->columns(3)
                     ->collapsible()

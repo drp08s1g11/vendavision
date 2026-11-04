@@ -276,9 +276,9 @@ class MarketplaceSyncService
      */
     public function syncAll(int $daysBack = 15): array
     {
-        $meli = $this->syncMercadoLivre($daysBack);
-        $shopee = $this->syncShopee($daysBack);
-        $amazon = $this->syncAmazon($daysBack);
+        $meli = ApiIntegration::isProviderActive('mercadolivre') ? $this->syncMercadoLivre($daysBack) : ['success' => false, 'count' => 0];
+        $shopee = ApiIntegration::isProviderActive('shopee') ? $this->syncShopee($daysBack) : ['success' => false, 'count' => 0];
+        $amazon = ApiIntegration::isProviderActive('amazon') ? $this->syncAmazon($daysBack) : ['success' => false, 'count' => 0];
 
         $totalCount = ($meli['success'] ? ($meli['count'] ?? 0) : 0) +
                       ($shopee['success'] ? ($shopee['count'] ?? 0) : 0) +

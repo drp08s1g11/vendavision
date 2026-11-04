@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\SaleChannel;
 use App\Enums\SaleStatus;
 use App\Filament\Exports\SaleExporter;
+use App\Filament\Imports\SaleImporter;
 use App\Filament\Resources\SaleResource\Pages;
 use App\Models\Product;
 use App\Models\Sale;
@@ -16,6 +17,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Actions\ExportAction;
 use Filament\Tables\Actions\ExportBulkAction;
+use Filament\Tables\Actions\ImportAction;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
@@ -198,6 +200,12 @@ class SaleResource extends Resource
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('success')
                     ->exporter(SaleExporter::class),
+
+                ImportAction::make()
+                    ->label('Importar Vendas (Excel / CSV)')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->color('primary')
+                    ->importer(SaleImporter::class),
             ])
             ->columns([
                 Tables\Columns\TextColumn::make('order_code')->label('Pedido')
