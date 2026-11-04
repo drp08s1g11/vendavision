@@ -151,22 +151,29 @@ class RebuildProductsFromShopee extends Command
                 $cat = 'Capas de Cadeira';
             }
 
-            // Preço de venda base unitário
+            // Preço de venda base unitário do anúncio
             $basePrice = !empty($d['prices']) ? min($d['prices']) : 59.90;
-            $costPrice = $knownCosts[$sku] ?? round($basePrice * 0.50, 2);
+            $avgPrice = !empty($d['prices']) ? (array_sum($d['prices']) / count($d['prices'])) : $basePrice;
+            $avgNet = !empty($d['net_amounts']) ? (array_sum($d['net_amounts']) / count($d['net_amounts'])) : ($basePrice * 0.70);
+            $taxaPct = $avgPrice > 0 ? max(1 - ($avgNet / $avgPrice), 0.15) : 0.25;
+            
+            // Custo da Operação = Taxas e Comissões cobradas pela Shopee
+            $costFee = round($basePrice * $taxaPct, 2);
 
             Product::create([
                 'sku' => $sku,
                 'name' => $cleanName,
                 'category' => $cat,
-                'description' => "Produto importado do catálogo oficial da Shopee (SKU {$sku})",
-                'cost_price' => $costPrice,
+                'description' => "Produto Shopee (SKU {$sku}) - Custo baseado nas taxas oficiais da Shopee",
+                'cost_price' => $costFee,
                 'sale_price' => $basePrice,
                 'stock_reference' => 'Ambrozio Decora',
                 'is_active' => true,
             ]);
 
-            $this->line("Criado produto [SKU: {$sku}] {$cleanName} (Venda: R$ {$basePrice} | Custo: R$ {$costPrice})");
+            $liquidoEstimado = round($basePrice - $costFee, 2);
+            $margemPct = round(($liquidoEstimado / $basePrice) * 100, 1);
+            $this->line("Criado [SKU: {$sku}] {$cleanName} (Venda: R$ {$basePrice} | Taxa Shopee: R$ {$costFee} | Líquido Repassado: R$ {$liquidoEstimado} [{$margemPct}%])");
             $created++;
         }
 

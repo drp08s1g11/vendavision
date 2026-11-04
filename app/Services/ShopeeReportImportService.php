@@ -222,12 +222,23 @@ class ShopeeReportImportService
                 $sale->notes = "Cliente: " . ($orderData['buyer'] ?? 'Shopee') . " | Pgto: " . ($orderData['payment_method'] ?? 'Shopee');
 
                 $totalRevenue = $orderData['gross_amount'] > 0 ? $orderData['gross_amount'] : max($orderData['net_released'], 0);
-                $marketplaceFee = $orderData['shopee_fee'] > 0 ? $orderData['shopee_fee'] : round($totalRevenue * 0.20, 2);
+                $netReleased = max($orderData['net_released'], 0);
+
+                // Taxas da Shopee: diferença exata entre Preço do Produto e Quantia Lançada
+                $marketplaceFee = max(round($totalRevenue - $netReleased, 2), 0.0);
+                if ($marketplaceFee <= 0 && $orderData['shopee_fee'] > 0) {
+                    $marketplaceFee = $orderData['shopee_fee'];
+                }
+
+                // Lucro Líquido Oficial da Shopee = Quantia total lançada (o dinheiro que caiu na carteira)
+                $grossProfit = $netReleased > 0 ? $netReleased : max(round($totalRevenue - $marketplaceFee, 2), 0.0);
+                $profitMargin = $totalRevenue > 0 ? round(($grossProfit / $totalRevenue) * 100, 2) : 0.0;
 
                 $totalCost = 0.0;
                 $itemsToPersist = [];
 
                 $items = !empty($orderData['items']) ? $orderData['items'] : [['sku' => null, 'name' => 'Item Shopee', 'price' => $totalRevenue]];
+                $itemFeeRatio = count($items) > 0 ? round($marketplaceFee / count($items), 2) : 0.0;
 
                 foreach ($items as $item) {
                     $itemSku = $item['sku'];
@@ -246,29 +257,20 @@ class ShopeeReportImportService
                         $product = Product::first();
                     }
 
-                    $unitCost = $product ? (float) $product->cost_price : round($unitPrice * 0.50, 2);
-                    $subtotal = $unitPrice;
-                    $costSubtotal = $unitCost;
-
-                    $totalCost += $costSubtotal;
-
                     $itemsToPersist[] = [
                         'product_id' => $product?->id,
                         'item_name' => $itemName,
                         'quantity' => 1,
                         'unit_price' => $unitPrice,
-                        'unit_cost' => $unitCost,
-                        'item_fee' => 0.00,
-                        'subtotal' => $subtotal,
-                        'cost_subtotal' => $costSubtotal,
+                        'unit_cost' => 0.00,
+                        'item_fee' => $itemFeeRatio,
+                        'subtotal' => $unitPrice,
+                        'cost_subtotal' => 0.00,
                     ];
                 }
 
-                $grossProfit = round($totalRevenue - $totalCost - $marketplaceFee, 2);
-                $profitMargin = $totalRevenue > 0 ? round(($grossProfit / $totalRevenue) * 100, 2) : 0.0;
-
                 $sale->total_amount = $totalRevenue;
-                $sale->total_cost = $totalCost;
+                $sale->total_cost = 0.00;
                 $sale->marketplace_fee = $marketplaceFee;
                 $sale->gross_profit = $grossProfit;
                 $sale->profit_margin = $profitMargin;

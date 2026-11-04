@@ -40,7 +40,7 @@ class AbcAnalysis extends Page
                 'products.category',
                 DB::raw('SUM(sale_items.quantity) as total_quantity'),
                 DB::raw('SUM(sale_items.subtotal) as total_revenue'),
-                DB::raw('SUM(sale_items.subtotal - sale_items.cost_subtotal) as total_profit'),
+                DB::raw('SUM(sale_items.subtotal - sale_items.item_fee) as total_profit'),
             ])
             ->groupBy('products.id', 'products.name', 'products.sku', 'products.category')
             ->orderByDesc('total_revenue')
