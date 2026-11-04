@@ -29,6 +29,24 @@ class SaleExporter extends Exporter
                 ->label('Status do Pedido')
                 ->formatStateUsing(fn ($state) => $state instanceof \App\Enums\SaleStatus ? $state->getLabel() : (string) $state),
 
+            ExportColumn::make('product_names')
+                ->label('Nome do Produto')
+                ->state(function (Sale $record): string {
+                    return $record->items->map(fn ($item) => $item->item_name ?? $item->product?->name)->filter()->unique()->implode(' + ') ?: 'Item Venda';
+                }),
+
+            ExportColumn::make('product_skus')
+                ->label('Código SKU')
+                ->state(function (Sale $record): string {
+                    return $record->items->map(fn ($item) => $item->product?->sku)->filter()->unique()->implode(' + ') ?: '';
+                }),
+
+            ExportColumn::make('items_quantity')
+                ->label('Quantidade de Itens')
+                ->state(function (Sale $record): int {
+                    return (int) ($record->items->sum('quantity') ?: 1);
+                }),
+
             ExportColumn::make('total_amount')
                 ->label('Faturamento (R$)')
                 ->formatStateUsing(fn ($state) => number_format((float) $state, 2, ',', '.')),

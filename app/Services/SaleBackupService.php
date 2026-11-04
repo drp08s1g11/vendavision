@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Enums\SaleChannel;
 use App\Enums\SaleStatus;
+use App\Models\Product;
 use App\Models\Sale;
+use App\Models\SaleItem;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -145,6 +147,9 @@ class SaleBackupService
         $colSoldAt = $findCol(['sold_at', 'datadavenda', 'datadecriacaodopedido', 'data']);
         $colChannel = $findCol(['channel', 'canalmarketplace', 'canal', 'marketplace']);
         $colStatus = $findCol(['status', 'statusdopedido']);
+        $colProductName = $findCol(['nomedoproduto', 'nomedoprodutoitens', 'produto', 'item_name']);
+        $colSku = $findCol(['codigosku', 'sku', 'referencia']);
+        $colQty = $findCol(['quantidadedeitens', 'quantidade', 'qty']);
         $colTotalAmount = $findCol(['total_amount', 'faturamentor', 'faturamento', 'precodoproduto', 'total']);
         $colTotalCost = $findCol(['total_cost', 'custototalr', 'custototal', 'custo']);
         $colGrossProfit = $findCol(['gross_profit', 'lucrobrutor', 'lucrobruto', 'lucro']);
@@ -194,7 +199,10 @@ class SaleBackupService
                 // Comparativo com a base existente para não duplicar
                 $existing = Sale::where('order_code', $orderCode)->first();
 
+                $targetSale = null;
+
                 if ($existing) {
+                    $targetSale = $existing;
                     // Verifica se os valores são iguais aos já registrados
                     $isIdentical = (
                         (float) $existing->total_amount === (float) $totalAmount &&
@@ -221,7 +229,7 @@ class SaleBackupService
                     }
                 } else {
                     // Cria nova venda sem duplicidade
-                    Sale::create([
+                    $targetSale = Sale::create([
                         'order_code' => $orderCode,
                         'sold_at' => $soldAt,
                         'channel' => $channel,
@@ -234,6 +242,35 @@ class SaleBackupService
                         'shipping_cost' => $shippingCost,
                     ]);
                     $created++;
+                }
+
+                // Cria ou sincroniza o item da venda se informado na planilha
+                $productName = $colProductName !== null ? trim((string) ($row[$colProductName] ?? '')) : null;
+                $sku = $colSku !== null ? trim((string) ($row[$colSku] ?? '')) : null;
+                $qty = $colQty !== null ? max((int) ($row[$colQty] ?? 1), 1) : 1;
+
+                if ($targetSale && (filled($productName) || filled($sku))) {
+                    $matchedProduct = null;
+                    if (filled($sku)) {
+                        $matchedProduct = Product::where('sku', $sku)->first();
+                    }
+                    if (!$matchedProduct && filled($productName)) {
+                        $matchedProduct = Product::where('name', $productName)->first();
+                    }
+
+                    SaleItem::updateOrCreate(
+                        ['sale_id' => $targetSale->id],
+                        [
+                            'product_id' => $matchedProduct?->id,
+                            'item_name' => $productName ?: ($matchedProduct?->name ?? 'Item Venda'),
+                            'quantity' => $qty,
+                            'unit_price' => $qty > 0 ? round($totalAmount / $qty, 2) : $totalAmount,
+                            'unit_cost' => $qty > 0 ? round($totalCost / $qty, 2) : $totalCost,
+                            'item_fee' => $marketplaceFee,
+                            'subtotal' => $totalAmount,
+                            'cost_subtotal' => $totalCost,
+                        ]
+                    );
                 }
             }
 
