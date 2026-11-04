@@ -86,4 +86,39 @@ class SalesProfitChartWidgetTest extends TestCase
         $this->assertContains('15/10', $dailyData['labels']);
         $this->assertEquals(1200.00, array_sum($dailyData['datasets'][0]['data']));
     }
+
+    public function test_channel_distribution_widget_is_hidden_when_single_platform_is_used(): void
+    {
+        // Apenas Shopee ativa e todas as vendas da Shopee
+        \App\Models\ApiIntegration::create([
+            'name' => 'Shopee Oficial',
+            'provider' => 'shopee',
+            'is_active' => true,
+        ]);
+
+        Sale::create([
+            'order_code' => 'ORD-SHOPEE',
+            'sold_at' => '2026-10-15',
+            'channel' => SaleChannel::Shopee,
+            'status' => SaleStatus::Paid,
+            'total_amount' => 500.00,
+        ]);
+
+        // Deve estar oculto pois só há 1 plataforma em uso
+        $this->assertFalse(\App\Filament\Widgets\ChannelSalesChartWidget::canView());
+
+        // O widget financeiro deve ocupar 100% da tela (largura total)
+        $chartWidget = new SalesProfitChartWidget();
+        $this->assertEquals('full', $chartWidget->getColumnSpan());
+
+        // Ativa um segundo marketplace
+        \App\Models\ApiIntegration::create([
+            'name' => 'Mercado Livre Loja',
+            'provider' => 'mercadolivre',
+            'is_active' => true,
+        ]);
+
+        // Agora que há mais de uma plataforma, o gráfico deve ser exibido
+        $this->assertTrue(\App\Filament\Widgets\ChannelSalesChartWidget::canView());
+    }
 }

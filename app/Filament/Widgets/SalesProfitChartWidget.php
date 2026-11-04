@@ -20,6 +20,19 @@ class SalesProfitChartWidget extends ChartWidget
     ];
     protected static ?string $maxHeight = '320px';
 
+    public function getColumnSpan(): int | string | array
+    {
+        // Se o widget de distribuição por canal estiver oculto, expande para largura total
+        if (! ChannelSalesChartWidget::canView()) {
+            return 'full';
+        }
+
+        return [
+            'md' => 8,
+            'xl' => 8,
+        ];
+    }
+
     /**
      * Resolve o intervalo de datas baseado nos filtros do dashboard.
      *

@@ -20,6 +20,21 @@ class ChannelSalesChartWidget extends ChartWidget
     ];
     protected static ?string $maxHeight = '320px';
 
+    /**
+     * Oculta o gráfico quando somente uma plataforma é utilizada.
+     * Exibido automaticamente somente quando outros canais forem ativados ou possuírem vendas.
+     */
+    public static function canView(): bool
+    {
+        $activeProviders = \App\Models\ApiIntegration::getActiveProviders();
+        if (count($activeProviders) > 1) {
+            return true;
+        }
+
+        $distinctSalesChannels = Sale::distinct()->count('channel');
+        return $distinctSalesChannels > 1;
+    }
+
     protected function getData(): array
     {
         $startDate = $this->filters['startDate'] ?? null;
