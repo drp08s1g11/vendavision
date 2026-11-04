@@ -12,7 +12,7 @@ class SaleItem extends Model
     use HasFactory;
 
     protected $fillable = [
-        'sale_id', 'product_id', 'quantity', 'unit_price', 'unit_cost',
+        'sale_id', 'product_id', 'item_name', 'quantity', 'unit_price', 'unit_cost',
         'subtotal', 'cost_subtotal', 'item_fee',
     ];
 

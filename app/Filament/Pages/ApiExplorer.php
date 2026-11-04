@@ -85,13 +85,13 @@ class ApiExplorer extends Page implements HasForms
                         Forms\Components\Select::make('days_back')
                             ->label('Período de Busca')
                             ->options([
+                                1 => 'Últimas 24 horas',
                                 3 => 'Últimos 3 dias',
                                 7 => 'Últimos 7 dias',
-                                15 => 'Últimos 15 dias',
-                                30 => 'Últimos 30 dias',
-                                90 => 'Últimos 90 dias',
+                                15 => 'Últimos 15 dias (Limite máximo por chamada da Shopee)',
                             ])
-                            ->default(15),
+                            ->default(15)
+                            ->helperText('A API da Shopee limita cada consulta a uma janela máxima de 15 dias.'),
 
                         Forms\Components\TextInput::make('page_size')
                             ->label('Limite de Registros')
