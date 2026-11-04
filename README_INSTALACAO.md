@@ -89,10 +89,16 @@ docker compose exec laravel.test php artisan migrate --seed
 Após concluir os passos acima, acesse pelo navegador:
 
 - **URL:** [http://localhost/admin](http://localhost/admin)
-- **E-mail:** `admin@ambrozio.com.br`
-- **Senha:** `password`
+- **E-mail:** `admin@vendavision.com`
+- **Senha temporária:** `password`
 
-*(Recomendamos alterar a senha no primeiro acesso).*
+> 🔐 **Redefinição de Senha Obrigatória no Primeiro Acesso:**  
+> Por segurança (OWASP/LGPD), no primeiro login o sistema exigirá o cadastro de uma nova senha permanente com:
+> - No mínimo **14 caracteres**
+> - Pelo menos uma **letra maiúscula** (A-Z)
+> - Pelo menos uma **letra minúscula** (a-z)
+> - Pelo menos um **número** (0-9)
+> - Pelo menos um **caractere especial permitido**: `!` `@` `#` `$` `%` `&` `*`
 
 ---
 

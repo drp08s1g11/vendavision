@@ -194,11 +194,20 @@ Abra seu navegador (Google Chrome, Firefox, Edge, etc.) e acerte o endereço:
 🌐 **URL de Acesso ao Painel Administrativo:**  
 👉 **[http://localhost/admin](http://localhost/admin)**
 
-### Credenciais de Login Padrão:
-- **E-mail:** `admin@ambrozio.com.br`
-- **Senha:** `password`
+### Credenciais de Acesso Inicial:
+- **E-mail:** `admin@vendavision.com`
+- **Senha temporária:** `password`
 
-*(Ao entrar, você verá a interface com tema de alto contraste, menus de Produtos, Vendas, Clientes, Categorias, Simulador de Preço, Curva ABC e a página de Dicas e Instruções para Importação de Planilhas).*
+> 🔐 **Redefinição Obrigatória no Primeiro Login:**  
+> Por conformidade de segurança e proteção de dados (OWASP/LGPD), ao entrar com a senha temporária o sistema abrirá imediatamente a tela de redefinição de senha com os seguintes requisitos obrigatórios:
+> - No mínimo **14 dígitos / caracteres**
+> - Pelo menos uma **letra maiúscula** (A-Z)
+> - Pelo menos uma **letra minúscula** (a-z)
+> - Pelo menos um **número** (0-9)
+> - Pelo menos um **caractere especial permitido**: `!` `@` `#` `$` `%` `&` `*`
+> - Confirmação de senha idêntica
+
+*(Após cadastrar a nova senha definitiva, você terá acesso imediato e irrestrito ao Dashboard e todos os recursos).*
 
 ---
 

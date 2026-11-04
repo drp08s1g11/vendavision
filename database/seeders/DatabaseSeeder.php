@@ -15,13 +15,17 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        User::firstOrCreate(
-            ['email' => 'admin@ambrozio.com.br'],
+        User::updateOrCreate(
+            ['email' => 'admin@vendavision.com'],
             [
                 'name' => 'Administrador',
                 'password' => Hash::make('password'),
+                'must_change_password' => true,
             ]
         );
+
+        // Remove usuário legado anterior se existir
+        User::where('email', 'admin@ambrozio.com.br')->delete();
 
         // Caso deseje popular o sistema com o catálogo e vendas de demonstração:
         // php artisan db:seed --class=AmbrozioDecoraSeeder
