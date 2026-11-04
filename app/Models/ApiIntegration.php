@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\SafeEncryptedCast;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -24,12 +25,12 @@ class ApiIntegration extends Model
     ];
 
     /**
-     * Criptografa automaticamente credenciais sensíveis no MySQL
+     * Criptografa automaticamente credenciais sensíveis no MySQL com tratamento seguro de chave/MAC
      */
     protected $casts = [
-        'client_secret' => 'encrypted',
-        'access_token' => 'encrypted',
-        'refresh_token' => 'encrypted',
+        'client_secret' => SafeEncryptedCast::class,
+        'access_token' => SafeEncryptedCast::class,
+        'refresh_token' => SafeEncryptedCast::class,
         'extra_fields' => 'array',
         'is_active' => 'boolean',
         'last_synced_at' => 'datetime',
