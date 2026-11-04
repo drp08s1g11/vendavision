@@ -20,28 +20,57 @@ class ShopeeReportImportService
      */
     public function importFromCsvContent(string $csvContent): array
     {
-        // Converte quebras de linha e remove caracteres nulos
-        $cleanContent = str_replace("\0", '', $csvContent);
+        // Remove BOM UTF-8 e caracteres nulos
+        $cleanContent = preg_replace('/^\xEF\xBB\xBF/', '', $csvContent);
+        $cleanContent = str_replace("\0", '', $cleanContent);
         $lines = preg_split('/\r\n|\r|\n/', $cleanContent);
 
+        // Auto-detecta delimitador baseado no cabeçalho ou primeiras linhas (ponto-e-vírgula vs vírgula vs tab)
+        $sample = substr($cleanContent, 0, 3000);
+        $countSemicolon = substr_count($sample, ';');
+        $countComma = substr_count($sample, ',');
+        $countTab = substr_count($sample, "\t");
+
+        $delimiter = ',';
+        if ($countSemicolon > $countComma && $countSemicolon > $countTab) {
+            $delimiter = ';';
+        } elseif ($countTab > $countComma && $countTab > $countSemicolon) {
+            $delimiter = "\t";
+        }
+
+        // Função robusta para interpretar números em formato brasileiro (ex: 60,82 ou 1.250,50 ou -4.49)
+        $parseNumber = function ($val): float {
+            if ($val === null || $val === '' || $val === '-') {
+                return 0.0;
+            }
+            $val = trim((string) $val);
+            $val = preg_replace('/[^\d,.-]/', '', $val);
+            if (empty($val) || $val === '-' || $val === '.') {
+                return 0.0;
+            }
+            if (str_contains($val, '.') && str_contains($val, ',')) {
+                $val = str_replace('.', '', $val);
+                $val = str_replace(',', '.', $val);
+            } elseif (str_contains($val, ',')) {
+                $val = str_replace(',', '.', $val);
+            }
+            return (float) $val;
+        };
+
         // Encontra o cabeçalho oficial da tabela de pedidos da Shopee.
-        // Em relatórios anuais, a Shopee insere tabelas de resumo no topo e ajustes no meio.
-        // O cabeçalho real possui colunas essenciais como 'ID do pedido', 'Preço do produto' e 'Nome do produto'.
         $headerRowIndex = null;
         $headers = [];
 
         foreach ($lines as $idx => $line) {
-            $cols = str_getcsv($line, ',');
+            $cols = str_getcsv($line, $delimiter);
             $lineLower = mb_strtolower($line);
 
             if (
                 str_contains($lineLower, 'id do pedido') &&
-                (str_contains($lineLower, 'preço do produto') || str_contains($lineLower, 'nome do produto') || str_contains($lineLower, 'quantia total lançada'))
+                (str_contains($lineLower, 'preço do produto') || str_contains($lineLower, 'nome do produto') || str_contains($lineLower, 'quantia total lançada') || str_contains($lineLower, 'sku'))
             ) {
-                // Seleciona essa linha como cabeçalho
                 $headerRowIndex = $idx;
                 $headers = $cols;
-                // Continua procurando se houver mais de uma ocorrência, ou usa a primeira que encontrar dados logo em seguida
                 break;
             }
         }
@@ -49,7 +78,7 @@ class ShopeeReportImportService
         if ($headerRowIndex === null) {
             return [
                 'success' => false,
-                'message' => 'Não foi possível localizar o cabeçalho da tabela de pedidos no arquivo. Verifique se o arquivo é o relatório de rendimento/pedidos oficial da Shopee.',
+                'message' => 'Não foi possível localizar o cabeçalho com "ID do pedido" no arquivo. Verifique se exportou a aba "Renda" da Shopee.',
             ];
         }
 
@@ -87,8 +116,8 @@ class ShopeeReportImportService
                 continue;
             }
 
-            $row = str_getcsv($line, ',');
-            if (count($row) < 5) {
+            $row = str_getcsv($line, $delimiter);
+            if (count($row) < 3) {
                 continue;
             }
 
@@ -100,19 +129,22 @@ class ShopeeReportImportService
             $sku = $getCol($row, ['sku', 'código sku', 'item_sku']);
             $productName = $getCol($row, ['nome do produto', 'produto', 'item_name']);
             $createdAt = $getCol($row, ['data de criação do pedido', 'data do pedido', 'data']);
-            $buyerUsername = $getCol($row, ['nome de usuário (comprador)', 'comprador']);
-            $paymentMethod = $getCol($row, ['método de pagamento do comprador', 'pagamento']);
+            $buyerUsername = $getCol($row, ['nome de usuário (comprador)', 'comprador', 'nome de usuário']);
+            $paymentMethod = $getCol($row, ['método de pagamento do comprador', 'pagamento', 'método de pagamento']);
             
             // Valores financeiros
-            $netReleased = (float) str_replace(',', '.', (string) $getCol($row, ['quantia total lançada (r$)', 'renda do pedido', 'valor liberado']));
-            $grossProductPrice = (float) str_replace(',', '.', (string) $getCol($row, ['preço do produto', 'valor do produto', 'subtotal de mercadoria']));
-            $refundAmount = (float) str_replace(',', '.', (string) $getCol($row, ['valor do reembolso', 'reembolso']));
+            $netReleased = $parseNumber($getCol($row, ['quantia total lançada (r$)', 'renda do pedido', 'valor liberado']));
+            $grossProductPrice = $parseNumber($getCol($row, ['preço do produto', 'valor do produto', 'subtotal de mercadoria']));
+            $refundAmount = $parseNumber($getCol($row, ['valor do reembolso', 'reembolso']));
             
             // Taxas oficiais da Shopee
-            $commissionFee = abs((float) str_replace(',', '.', (string) $getCol($row, ['taxa de comissão líquida', 'taxa de comissão'])));
-            $serviceFee = abs((float) str_replace(',', '.', (string) $getCol($row, ['taxa de serviço líquida', 'taxa de serviço'])));
-            $returnFee = abs((float) str_replace(',', '.', (string) $getCol($row, ['taxa de devolução fácil shopee', 'taxa de devolução'])));
-            $totalShopeeFee = round($commissionFee + $serviceFee + $returnFee, 2);
+            $commissionFee = abs($parseNumber($getCol($row, ['taxa de comissão líquida', 'taxa de comissão', 'taxa de comissão bruta'])));
+            $serviceFee = abs($parseNumber($getCol($row, ['taxa de serviço líquida', 'taxa de serviço', 'taxa de serviço bruta'])));
+            $transactionFee = abs($parseNumber($getCol($row, ['taxa de transação'])));
+            $easyReturnFee = abs($parseNumber($getCol($row, ['taxa de devolução fácil shopee', 'taxa de devolução'])));
+            $affiliateFee = abs($parseNumber($getCol($row, ['taxa de comissão afiliados do vendedor'])));
+
+            $totalShopeeFee = round($commissionFee + $serviceFee + $transactionFee + $easyReturnFee + $affiliateFee, 2);
 
             if (!isset($ordersToProcess[$orderCode])) {
                 $ordersToProcess[$orderCode] = [
@@ -127,12 +159,21 @@ class ShopeeReportImportService
                     'items' => [],
                 ];
             } else {
-                // Atualiza valores caso a primeira linha tenha sido resumida
+                // Atualiza dados cadastrais e financeiros caso tenham vindo na outra linha
+                if (empty($ordersToProcess[$orderCode]['buyer']) && filled($buyerUsername) && $buyerUsername !== '-') {
+                    $ordersToProcess[$orderCode]['buyer'] = $buyerUsername;
+                }
+                if (empty($ordersToProcess[$orderCode]['payment_method']) && filled($paymentMethod) && $paymentMethod !== '-') {
+                    $ordersToProcess[$orderCode]['payment_method'] = $paymentMethod;
+                }
                 if ($ordersToProcess[$orderCode]['gross_amount'] <= 0 && $grossProductPrice > 0) {
                     $ordersToProcess[$orderCode]['gross_amount'] = $grossProductPrice;
                 }
                 if ($ordersToProcess[$orderCode]['shopee_fee'] <= 0 && $totalShopeeFee > 0) {
                     $ordersToProcess[$orderCode]['shopee_fee'] = $totalShopeeFee;
+                }
+                if ($ordersToProcess[$orderCode]['net_released'] <= 0 && $netReleased > 0) {
+                    $ordersToProcess[$orderCode]['net_released'] = $netReleased;
                 }
             }
 
