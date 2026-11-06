@@ -24,20 +24,12 @@ class ProductExporter extends Exporter
                 ->label('Categoria'),
 
             ExportColumn::make('cost_price')
-                ->label('Preço de Custo (R$)')
+                ->label('Preço de Custo')
                 ->formatStateUsing(fn ($state) => number_format((float) $state, 2, ',', '.')),
 
             ExportColumn::make('sale_price')
-                ->label('Preço de Venda (R$)')
+                ->label('Preço de Venda')
                 ->formatStateUsing(fn ($state) => number_format((float) $state, 2, ',', '.')),
-
-            ExportColumn::make('unit_profit')
-                ->label('Lucro Estimado (R$)')
-                ->formatStateUsing(fn ($state) => number_format((float) $state, 2, ',', '.')),
-
-            ExportColumn::make('estimated_margin')
-                ->label('Margem Estimada (%)')
-                ->formatStateUsing(fn ($state) => number_format((float) $state, 2, ',', '.') . '%'),
 
             ExportColumn::make('stock_reference')
                 ->label('Fornecedor Parceiro'),

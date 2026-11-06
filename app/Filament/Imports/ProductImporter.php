@@ -52,32 +52,19 @@ class ProductImporter extends Importer
         }
 
         $val = round((float) $cleaned, 2);
-        // Preços negativos em planilhas (erros de digitação como -0,49) são convertidos para 0.00
         return $isNegative ? 0.00 : $val;
     }
 
     public static function getColumns(): array
     {
         return [
-            ImportColumn::make('name')
-                ->label('Nome do Produto')
-                ->guess([
-                    'nome_do_produto',
-                    'nome',
-                    'produto',
-                    'titulo',
-                    'nome do produto',
-                    'name',
-                ])
-                ->requiredMapping()
-                ->castStateUsing(fn ($state) => filled($state) ? trim((string) $state) : null)
-                ->rules(['required', 'max:255']),
-
             ImportColumn::make('sku')
                 ->label('Código do Produto (SKU)')
                 ->guess([
-                    'codigo_produto_sku',
                     'codigo_do_produto_sku',
+                    'código do produto (sku)',
+                    'codigo do produto (sku)',
+                    'codigo_produto_sku',
                     'codigo_sku',
                     'codigo',
                     'sku',
@@ -91,10 +78,26 @@ class ProductImporter extends Importer
                 })
                 ->rules(['required', 'max:64']),
 
+            ImportColumn::make('name')
+                ->label('Nome do Produto')
+                ->guess([
+                    'nome_do_produto',
+                    'nome do produto',
+                    'nome',
+                    'produto',
+                    'titulo',
+                    'name',
+                ])
+                ->requiredMapping()
+                ->castStateUsing(fn ($state) => filled($state) ? trim((string) $state) : null)
+                ->rules(['required', 'max:255']),
+
             ImportColumn::make('category')
-                ->label('Categoria do Item')
+                ->label('Categoria')
                 ->guess([
                     'categoria',
+                    'categoria_do_item',
+                    'categoria do item',
                     'tipo',
                     'departamento',
                     'category',
@@ -103,13 +106,17 @@ class ProductImporter extends Importer
                 ->rules(['nullable', 'max:255']),
 
             ImportColumn::make('cost_price')
-                ->label('Preço de Custo (Fornecedor)')
+                ->label('Preço de Custo')
                 ->guess([
-                    'preco_de_custo_fornecedor',
                     'preco_de_custo',
+                    'preço de custo',
+                    'preco de custo',
+                    'preço de custo (r$)',
+                    'preco de custo (r$)',
+                    'preco_de_custo_r',
+                    'preco_de_custo_fornecedor',
                     'custo_fornecedor',
                     'custo',
-                    'preco de custo',
                     'cost_price',
                 ])
                 ->requiredMapping()
@@ -120,10 +127,14 @@ class ProductImporter extends Importer
                 ->label('Preço de Venda')
                 ->guess([
                     'preco_de_venda',
+                    'preço de venda',
+                    'preco de venda',
+                    'preço de venda (r$)',
+                    'preco de venda (r$)',
+                    'preco_de_venda_r',
                     'preco_venda',
                     'valor_de_venda',
                     'preco',
-                    'preco de venda',
                     'sale_price',
                 ])
                 ->requiredMapping()
@@ -134,6 +145,7 @@ class ProductImporter extends Importer
                 ->label('Fornecedor Parceiro')
                 ->guess([
                     'fornecedor_parceiro',
+                    'fornecedor parceiro',
                     'fornecedor',
                     'fabricante',
                     'parceiro',
@@ -145,6 +157,9 @@ class ProductImporter extends Importer
             ImportColumn::make('description')
                 ->label('Descrição e Detalhes')
                 ->guess([
+                    'descricao_e_detalhes',
+                    'descrição e detalhes',
+                    'descricao e detalhes',
                     'descricao_detalhada',
                     'descricao',
                     'detalhes',
@@ -154,9 +169,12 @@ class ProductImporter extends Importer
                 ->rules(['nullable']),
 
             ImportColumn::make('is_active')
-                ->label('Produto Ativo (1=Sim / 0=Não)')
+                ->label('Status Ativo')
                 ->guess([
+                    'status_ativo',
+                    'status ativo',
                     'produto_ativo',
+                    'produto ativo',
                     'ativo',
                     'status',
                     'disponivel',
