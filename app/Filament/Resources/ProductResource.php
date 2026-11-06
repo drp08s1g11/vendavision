@@ -142,13 +142,13 @@ class ProductResource extends Resource
         return $table
             ->headerActions([
                 ExportAction::make()
-                    ->label('Exportar Produtos (Excel / CSV)')
+                    ->label('Exportar Produtos (.CSV / Excel)')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('success')
                     ->exporter(ProductExporter::class),
 
                 ImportAction::make()
-                    ->label('Importar Produtos (Excel / CSV)')
+                    ->label('Importar Produtos (.CSV)')
                     ->icon('heroicon-o-arrow-up-tray')
                     ->color('primary')
                     ->importer(ProductImporter::class),
