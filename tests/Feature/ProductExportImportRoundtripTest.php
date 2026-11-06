@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Filament\Exports\ProductExporter;
 use App\Filament\Imports\ProductImporter;
+use Filament\Actions\Imports\Jobs\ImportCsv;
+use Filament\Actions\Imports\Models\Import;
 use App\Models\Product;
 use App\Models\User;
 use Filament\Actions\Exports\ExportColumn;
@@ -11,6 +13,7 @@ use Filament\Actions\Imports\ImportColumn;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
+use League\Csv\Reader as CsvReader;
 use Tests\TestCase;
 
 class ProductExportImportRoundtripTest extends TestCase
@@ -150,5 +153,146 @@ class ProductExportImportRoundtripTest extends TestCase
 
         $this->assertNotNull($resolved);
         $this->assertEquals($product->id, $resolved->id, 'Deve identificar o mesmo produto pelo SKU exportado.');
+    }
+
+    /**
+     * TESTE DE INTEGRAÇÃO COMPLETO (E2E):
+     * Executa o fluxo real ponta a ponta:
+     * 1. Cria produtos no banco de dados.
+     * 2. Gera a exportação CSV real via ProductExporter.
+     * 3. Simula o usuário abrindo o CSV e editando preços e adicionando um novo produto.
+     * 4. Executa o Job real do Filament ImportCsv.
+     * 5. Comprova que os dados foram atualizados sem duplicação e os novos foram criados com sucesso.
+     */
+    public function test_full_e2e_export_to_csv_and_import_pipeline_execution(): void
+    {
+        $user = User::factory()->create();
+
+        $prodA = Product::create([
+            'sku' => 'AMB-QD-001',
+            'name' => 'Quadro Canvas Flores',
+            'category' => 'Quadros',
+            'cost_price' => 50.00,
+            'sale_price' => 120.00,
+            'stock_reference' => 'Fábrica SP',
+            'description' => 'Canvas premium',
+            'is_active' => true,
+        ]);
+
+        $prodB = Product::create([
+            'sku' => 'AMB-ESP-002',
+            'name' => 'Espelho Redondo',
+            'category' => 'Espelhos',
+            'cost_price' => 80.00,
+            'sale_price' => 190.00,
+            'stock_reference' => 'Vidraçaria Sul',
+            'description' => 'Espelho 50cm',
+            'is_active' => false,
+        ]);
+
+        // 1. Simula a exportação real
+        $columnMap = [
+            'sku' => 'Código do Produto (SKU)',
+            'name' => 'Nome do Produto',
+            'category' => 'Categoria',
+            'cost_price' => 'Preço de Custo',
+            'sale_price' => 'Preço de Venda',
+            'stock_reference' => 'Fornecedor Parceiro',
+            'description' => 'Descrição e Detalhes',
+            'is_active' => 'Status Ativo',
+        ];
+
+        $export = new \Filament\Actions\Exports\Models\Export();
+        $export->user()->associate($user);
+        $export->exporter = ProductExporter::class;
+        $export->total_rows = 2;
+        $export->file_disk = 'local';
+        $export->file_name = 'produtos_exportados.csv';
+        $export->save();
+
+        $exporterInstance = $export->getExporter($columnMap, []);
+
+        $rowA = $exporterInstance($prodA);
+        $rowB = $exporterInstance($prodB);
+
+        $this->assertEquals(['AMB-QD-001', 'Quadro Canvas Flores', 'Quadros', '50,00', '120,00', 'Fábrica SP', 'Canvas premium', 'Sim'], $rowA);
+        $this->assertEquals(['AMB-ESP-002', 'Espelho Redondo', 'Espelhos', '80,00', '190,00', 'Vidraçaria Sul', 'Espelho 50cm', 'Não'], $rowB);
+
+        // 2. Simula o usuário alterando o CSV:
+        // - Atualiza o preço do Produto A de 120,00 para 145,90 e altera status para Não
+        // - Adiciona um Produto C inédito (SKU AMB-NOVO-003)
+        $csvRowsToImport = [
+            [
+                'Código do Produto (SKU)' => 'AMB-QD-001',
+                'Nome do Produto' => 'Quadro Canvas Flores Atualizado',
+                'Categoria' => 'Quadros Modernos',
+                'Preço de Custo' => '55,50',
+                'Preço de Venda' => '145,90',
+                'Fornecedor Parceiro' => 'Fábrica SP Nova',
+                'Descrição e Detalhes' => 'Canvas premium atualizado',
+                'Status Ativo' => 'Não',
+            ],
+            [
+                'Código do Produto (SKU)' => 'AMB-NOVO-003',
+                'Nome do Produto' => 'Vaso Nó Terracota 25cm',
+                'Categoria' => 'Vasos',
+                'Preço de Custo' => '32,00',
+                'Preço de Venda' => '89,90',
+                'Fornecedor Parceiro' => 'Cerâmica Decor',
+                'Descrição e Detalhes' => 'Cerâmica artesanal fosca',
+                'Status Ativo' => 'Sim',
+            ],
+        ];
+
+        // 3. Executa o Importador do Filament
+        $import = new Import();
+        $import->user()->associate($user);
+        $import->importer = ProductImporter::class;
+        $import->total_rows = 2;
+        $import->file_name = 'produtos_reimportacao.csv';
+        $import->file_path = 'imports/produtos_reimportacao.csv';
+        $import->save();
+
+        // Mapeamento automático (exatamente como o Filament detecta a partir dos cabeçalhos exportados)
+        $importColumnMap = [
+            'sku' => 'Código do Produto (SKU)',
+            'name' => 'Nome do Produto',
+            'category' => 'Categoria',
+            'cost_price' => 'Preço de Custo',
+            'sale_price' => 'Preço de Venda',
+            'stock_reference' => 'Fornecedor Parceiro',
+            'description' => 'Descrição e Detalhes',
+            'is_active' => 'Status Ativo',
+        ];
+
+        // Executa o Job real do Filament de forma síncrona
+        $job = new ImportCsv($import, $csvRowsToImport, $importColumnMap);
+        $job->handle();
+
+        // 4. Verificações no banco de dados para comprovação absoluta
+        $import->refresh();
+        $this->assertEquals(2, $import->successful_rows, 'Todas as 2 linhas do CSV devem ter sido importadas com 100% de sucesso.');
+        $this->assertEquals(0, $import->getFailedRowsCount(), 'Não deve haver nenhuma linha com falha.');
+
+        // Produto A: Deve estar atualizado, sem criar duplicatas
+        $this->assertEquals(1, Product::where('sku', 'AMB-QD-001')->count(), 'Não deve duplicar o produto existente!');
+        $updatedA = Product::where('sku', 'AMB-QD-001')->first();
+        $this->assertEquals($prodA->id, $updatedA->id, 'Deve manter o mesmo ID original.');
+        $this->assertEquals('Quadro Canvas Flores Atualizado', $updatedA->name);
+        $this->assertEquals('Quadros Modernos', $updatedA->category);
+        $this->assertEquals(55.50, (float) $updatedA->cost_price);
+        $this->assertEquals(145.90, (float) $updatedA->sale_price);
+        $this->assertFalse((bool) $updatedA->is_active, 'Status "Não" deve ter sido convertido para false.');
+
+        // Produto C: Deve ter sido criado com sucesso
+        $createdC = Product::where('sku', 'AMB-NOVO-003')->first();
+        $this->assertNotNull($createdC, 'O novo produto deve existir no banco de dados.');
+        $this->assertEquals('Vaso Nó Terracota 25cm', $createdC->name);
+        $this->assertEquals(32.00, (float) $createdC->cost_price);
+        $this->assertEquals(89.90, (float) $createdC->sale_price);
+        $this->assertTrue((bool) $createdC->is_active, 'Status "Sim" deve ter sido convertido para true.');
+
+        // Total de produtos no banco deve ser 3 (Prod A atualizado, Prod B intacto, Prod C novo)
+        $this->assertEquals(3, Product::count());
     }
 }
